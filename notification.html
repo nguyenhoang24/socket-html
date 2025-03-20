@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notification Bell</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f4f4f9;
+    }
+
+    .notification-bell {
+      position: relative;
+      font-size: 2em;
+      color: #007bff;
+      cursor: pointer;
+    }
+
+    .notification-bell i {
+      font-size: 30px;
+    }
+
+    .notification-bell .badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      background-color: red;
+      color: white;
+      border-radius: 50%;
+      padding: 5px 10px;
+      font-size: 14px;
+    }
+
+    #notifications {
+      max-width: 600px;
+      margin: 20px auto;
+      list-style: none;
+      padding: 0;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      display: none; /* Initially hidden */
+    }
+
+    #notifications li {
+      padding: 15px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #notifications li:last-child {
+      border-bottom: none;
+    }
+
+    .notification-content {
+      flex: 1;
+    }
+
+    .notification-type {
+      font-size: 0.8em;
+      font-weight: bold;
+      padding: 5px 10px;
+      border-radius: 20px;
+      margin-right: 10px;
+      color: #fff;
+    }
+
+    .notification-type.PUSH {
+      background-color: #007bff;
+    }
+
+    .notification-type.EMAIL {
+      background-color: #28a745;
+    }
+
+    .notification-type.SMS {
+      background-color: #ffc107;
+    }
+
+    .notification-timestamp {
+      font-size: 0.8em;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <h1>WebSocket Notifications</h1>
+
+  <!-- Notification Bell -->
+  <div class="notification-bell" onclick="toggleNotifications()">
+    <i class="fas fa-bell"></i>
+    <span id="notificationBadge" class="badge">0</span> <!-- Badge for new notifications -->
+  </div>
+
+  <!-- Notification List (hidden by default) -->
+  <ul id="notifications"></ul>
+
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+  <script>
+    const socketUrl = 'http://103.154.62.40:8000/notification-service/api/v1.0/ws';
+
+    // Create a SockJS object with custom headers
+    const socket = new SockJS(socketUrl, null, {
+      headers: {
+        'Upgrade': 'websocket',  // Custom header to mimic the WebSocket upgrade request
+        // 'Authorization': 'Bearer YOUR_ACCESS_TOKEN', // Example of adding an Authorization header
+        // Add other custom headers as needed
+      }
+    });
+    const stompClient = Stomp.over(socket);
+    const notificationsList = document.getElementById('notifications');
+    const notificationBadge = document.getElementById('notificationBadge');
+    let unreadNotificationsCount = 0;  // Track unread notifications count
+
+    // Connect to WebSocket
+    stompClient.connect({}, (frame) => {
+      console.log('Connected: ' + frame);
+      stompClient.subscribe('/topic/user/0a1ef7ac-41e5-439d-909a-34c2f2f2b439/notifications', (message) => {
+        console.log('Received message:', message.body);
+        const notification = JSON.parse(message.body);
+        displayNotification(notification);
+        updateNotificationBadge();
+      });
+    });
+
+    // Function to display the notification in the list
+    function displayNotification(notification) {
+      const listItem = document.createElement('li');
+      const typeLabel = document.createElement('span');
+      typeLabel.classList.add('notification-type', notification.channel);
+      typeLabel.textContent = notification.channel;
+
+      const contentDiv = document.createElement('div');
+      contentDiv.classList.add('notification-content');
+      contentDiv.innerHTML = `
+        <strong>${notification.title || 'Notification'}</strong>
+        <p>${notification.message || notification.content}</p>
+      `;
+
+      const timestamp = document.createElement('span');
+      timestamp.classList.add('notification-timestamp');
+      timestamp.textContent = new Date().toLocaleString();
+
+      listItem.appendChild(typeLabel);
+      listItem.appendChild(contentDiv);
+      listItem.appendChild(timestamp);
+
+      notificationsList.appendChild(listItem);
+      notificationsList.style.display = 'block';  // Show the notification list
+    }
+
+    // Function to toggle the visibility of the notifications list
+    function toggleNotifications() {
+      if (notificationsList.style.display === 'none') {
+        notificationsList.style.display = 'block';
+      } else {
+        notificationsList.style.display = 'none';
+      }
+    }
+
+    // Update the notification badge with unread count
+    function updateNotificationBadge() {
+      unreadNotificationsCount++;
+      notificationBadge.textContent = unreadNotificationsCount;
+    }
+  </script>
+</body>
+</html>
